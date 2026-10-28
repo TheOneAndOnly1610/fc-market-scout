@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101827">
+<title>FC Market Scout</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#121d2e;--line:#29384e;--muted:#9aabc1;--text:#f3f7fc;--accent:#7dd3a7;--warn:#f6cf75}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#0b1220,#101b2b);color:var(--text);font:16px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:760px;margin:auto;padding:22px 15px 40px}.hero{padding:22px 4px 14px}.eyebrow{color:var(--accent);font-weight:750;letter-spacing:.08em;text-transform:uppercase;font-size:.76rem}
+h1{font-size:clamp(1.8rem,6vw,2.5rem);line-height:1.1;margin:.35rem 0 .65rem}p{color:var(--muted);margin:.35rem 0 0}.panel{background:rgba(18,29,46,.96);border:1px solid var(--line);border-radius:18px;padding:17px;margin:14px 0}
+h2{font-size:1.08rem;margin:0 0 13px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.field{display:flex;flex-direction:column;gap:6px}label{color:#c6d3e3;font-size:.88rem}
+input{width:100%;min-width:0;border:1px solid #3a4b63;border-radius:10px;padding:12px;background:#0b1422;color:var(--text);font:inherit}
+button{border:0;border-radius:11px;padding:12px 15px;font:inherit;font-weight:750;cursor:pointer;background:var(--accent);color:#092116}
+button.secondary{background:#26364b;color:var(--text);border:1px solid #3a4b63}button.remove{padding:7px 10px;background:#26364b;color:#dbe6f4}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:13px}.hint{font-size:.83rem;color:var(--muted)}.statrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.pill{display:inline-block;background:#1c3c35;color:#aaf0cb;padding:4px 9px;border-radius:99px;font-size:.78rem;font-weight:700}
+.listing{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}.rating{background:#20344a;border-radius:12px;padding:9px 10px;text-align:center;font-weight:800;min-width:56px}.rating small{display:block;color:var(--muted);font-size:.65rem}.details{flex:1;min-width:0}.details strong{display:block;overflow-wrap:anywhere}.price{font-weight:800;white-space:nowrap}.good{color:var(--accent)}.bad{color:var(--warn)}.empty{border:1px dashed #3a4b63;border-radius:12px;padding:18px;text-align:center;color:var(--muted)}
+.notice{padding:10px 12px;border-radius:10px;background:#1c2b3f;color:#dce8f7;margin-top:10px;display:none}.footer{font-size:.8rem;color:var(--muted);padding:4px}
+@media(max-width:440px){.grid{grid-template-columns:1fr 1fr}.panel{padding:14px}.price{font-size:.92rem}}
+</style>
+</head>
+<body><main>
+<header class="hero">
+<div class="eyebrow">Xbox · Ultimate Team</div>
+<h1>FC Market Scout</h1>
+<p>A manual listing checker for spotting cards that fit your filters.</p>
+</header>
+<section class="panel">
+<h2>Search filters</h2>
+<div class="grid">
+<div class="field"><label for="minRating">Minimum rating</label><input id="minRating" type="number" min="1" max="99" value="88"></div>
+<div class="field"><label for="minPrice">Minimum price</label><input id="minPrice" type="number" min="0" value="1000"></div>
+<div class="field"><label for="maxPrice">Maximum price</label><input id="maxPrice" type="number" min="0" value="10000"></div>
+<div class="field"><label>Platform</label><input value="Xbox" readonly aria-label="Platform Xbox"></div>
+</div>
+<p class="hint">A listing matches if its rating and price fall within these filters.</p>
+</section>
+<section class="panel">
+<h2>Add a listing you found</h2>
+<form id="listingForm">
+<div class="field"><label for="playerName">Player name / card type</label><input id="playerName" maxlength="100" placeholder="e.g. Player name" required></div>
+<div class="grid" style="margin-top:12px">
+<div class="field"><label for="rating">Rating</label><input id="rating" type="number" min="1" max="99" value="90" required></div>
+<div class="field"><label for="price">Buy-now price (coins)</label><input id="price" type="number" min="0" step="1" value="5000" required></div>
+</div>
+<div class="actions"><button type="submit">Add listing</button><button class="secondary" id="export" type="button">Export CSV</button></div>
+<div class="notice" id="notice" role="status"></div>
+</form>
+</section>
+<section class="panel">
+<div class="statrow"><h2 style="margin:0">Matching listings</h2><span class="pill" id="count">0 matches</span></div>
+<div id="results" style="margin-top:12px"><div class="empty">No entries yet. Add a listing you spot in the official market.</div></div>
+<div class="actions"><button class="secondary" id="clear" type="button">Clear all listings</button></div>
+</section>
+<section class="panel">
+<h2>How to use it</h2>
+<ol>
+<li>Open the official EA market in the game or Companion/Web App.</li>
+<li>Look for a player listing and enter its name, rating and buy-now price here.</li>
+<li>Use the matching list to check your chosen filters.</li>
+<li>If you decide to buy, do it yourself in the official EA interface.</li>
+</ol>
+<p class="hint">This app does not connect to EA, fetch live listings, sign in to your account, or buy cards. It stores entries only in this browser on this device.</p>
+</section>
+<div class="footer">Prototype · No EA affiliation · Check current EA rules before using third-party tools.</div>
+</main>
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+let listings=[];
+const num=id=>Number($(id).value);
+function say(msg){$('notice').textContent=msg;$('notice').style.display='block';}
+function validFilters(){return Number.isInteger(num('minRating'))&&num('minRating')>=1&&num('minRating')<=99&&Number.isFinite(num('minPrice'))&&Number.isFinite(num('maxPrice'))&&num('minPrice')>=0&&num('maxPrice')>=num('minPrice');}
+function render(){
+const results=$('results');results.replaceChildren();
+const matches=listings.filter(p=>p.rating>=num('minRating')&&p.price>=num('minPrice')&&p.price<=num('maxPrice')).sort((a,b)=>a.price-b.price);
+$('count').textContent=matches.length+' match'+(matches.length===1?'':'es');
+if(!matches.length){const d=document.createElement('div');d.className='empty';d.textContent=listings.length?'No entries match these filters. Try changing the rating or price range.':'No entries yet. Add a listing you spot in the official market.';results.append(d);return;}
+matches.forEach(p=>{
+const row=document.createElement('div');row.className='listing';
+const rating=document.createElement('div');rating.className='rating';rating.textContent=p.rating;const small=document.createElement('small');small.textContent='OVR';rating.append(small);
+const details=document.createElement('div');details.className='details';const strong=document.createElement('strong');strong.textContent=p.name;const meta=document.createElement('span');meta.className='hint';meta.textContent='Manually entered · Xbox';details.append(strong,meta);
+const price=document.createElement('div');price.className='price good';price.textContent=p.price.toLocaleString('en-GB')+' coins';
+const remove=document.createElement('button');remove.type='button';remove.className='remove';remove.textContent='Remove';remove.setAttribute('aria-label','Remove '+p.name);remove.addEventListener('click',()=>{listings=listings.filter(x=>x.id!==p.id);render();});
+row.append(rating,details,price,remove);results.append(row);
+});
+}
+$('listingForm').addEventListener('submit',e=>{
+e.preventDefault();
+const name=$('playerName').value.trim(),rating=num('rating'),price=num('price');
+if(!validFilters()){say('Check your filters: rating must be 1–99 and maximum price must be at least the minimum.');return;}
+if(!name||!Number.isInteger(rating)||rating<1||rating>99||!Number.isInteger(price)||price<0){say('Enter a name, a rating from 1 to 99 and a valid whole-number price.');return;}
+listings.push({id:Date.now()+Math.random(),name,rating,price});
+$('playerName').value='';say('Listing added. Matching entries are shown below.');render();
+});
+['minRating','minPrice','maxPrice'].forEach(id=>$(id).addEventListener('input',()=>{if(validFilters())render();else say('Check the filter values. Maximum price must be at least minimum price.');}));
+$('clear').addEventListener('click',()=>{listings=[];render();say('All listings cleared.');});
+$('export').addEventListener('click',()=>{
+const rows=[['Player','Rating','Price coins','Platform'],...listings.map(p=>[p.name,p.rating,p.price,'Xbox'])];
+const csv=rows.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='fc-market-listings.csv';a.click();URL.revokeObjectURL(url);say('CSV export prepared.');
+});
+render();
+})();
+</script>
+</body></html>
